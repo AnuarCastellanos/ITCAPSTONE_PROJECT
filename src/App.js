@@ -3,61 +3,84 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate } from 'react-ro
 
 const styles = {
   container: { padding: '20px', fontFamily: 'Segoe UI, sans-serif', backgroundColor: '#141414', color: 'white', minHeight: '100vh' },
-  nav: { display: 'flex', justifyContent: 'space-around', padding: '15px', background: '#000', marginBottom: '30px', borderBottom: '2px solid #E50914' },
+  nav: { display: 'flex', justifyContent: 'space-around', alignItems: 'center', padding: '15px', background: '#000', marginBottom: '30px', borderBottom: '2px solid #E50914', position: 'sticky', top: 0, zIndex: 100 },
   link: { color: 'white', textDecoration: 'none', fontWeight: 'bold' },
-  card: { background: '#2f2f2f', padding: '15px', borderRadius: '10px', marginBottom: '15px', position: 'relative' },
-  input: { padding: '12px', margin: '10px 0', width: '100%', borderRadius: '4px', border: 'none', fontSize: '16px' },
-  button: { padding: '12px 24px', backgroundColor: '#E50914', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' },
-  addBtn: { padding: '8px 12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', marginTop: '10px', width: '100%', fontWeight: 'bold' },
-  poster: { width: '100%', borderRadius: '5px' }
+  cartBadge: { backgroundColor: '#E50914', color: 'white', borderRadius: '50%', padding: '2px 8px', fontSize: '12px', marginLeft: '5px' },
+  card: { background: '#2f2f2f', padding: '20px', borderRadius: '10px', marginBottom: '15px', borderLeft: '5px solid #E50914' },
+  button: { padding: '10px 20px', backgroundColor: '#E50914', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' },
+  qtyBtn: { padding: '5px 10px', margin: '0 5px', cursor: 'pointer' },
+  warning: { color: '#ffcc00', fontWeight: 'bold', fontSize: '14px', marginTop: '10px' }
 };
 
-export default function App() {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('ezUser');
-    return saved ? JSON.parse(saved) : null;
-  });
+// Data inspired by Data.js requirements
+const SUBSCRIPTIONS = [
+  { id: 's1', name: "Individual Plan", price: 10, type: 'sub' },
+  { id: 's2', name: "Friendly Plan", price: 15, type: 'sub' },
+  { id: 's3', name: "Family Plan", price: 20, type: 'sub' }
+];
 
-  // SHARED STATE: Moved list up to App so both pages can access it
-  const [list, setList] = useState(() => {
-    const saved = localStorage.getItem('myStreamList');
+const ACCESSORIES = [
+  { id: 'a1', name: "EZTech T-Shirt", price: 25, type: 'acc' },
+  { id: 'a2', name: "EZTech Phone Case", price: 15, type: 'acc' }
+];
+
+export default function App() {
+  const [cart, setCart] = useState(() => {
+    const saved = localStorage.getItem('ezCart');
     return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('ezUser', JSON.stringify(user));
-  }, [user]);
+    localStorage.setItem('ezCart', JSON.stringify(cart));
+  }, [cart]);
 
-  useEffect(() => {
-    localStorage.setItem('myStreamList', JSON.stringify(list));
-  }, [list]);
+  const addToCart = (product) => {
+    const isSubscription = product.type === 'sub';
+    const hasSubscription = cart.some(item => item.type === 'sub');
 
-  // Helper to add from either page
-  const addToList = (title) => {
-    if (!list.find(m => m.title === title)) {
-      setList([...list, { id: Date.now(), title: title }]);
-      alert(`${title} added to StreamList!`);
+    if (isSubscription && hasSubscription) {
+      alert("WARNING: You can only have one active subscription at a time!");
+      return;
+    }
+
+    const existingItem = cart.find(item => item.id === product.id);
+    if (existingItem) {
+      setCart(cart.map(item => item.id === product.id ? { ...item, qty: item.qty + 1 } : item));
     } else {
-      alert("Movie already in list!");
+      setCart([...cart, { ...product, qty: 1 }]);
     }
   };
+
+  const updateQty = (id, delta) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        const newQty = item.qty + delta;
+        return newQty > 0 ? { ...item, qty: newQty } : item;
+      }
+      return item;
+    }).filter(item => item.qty > 0));
+  };
+
+  const removeFromCart = (id) => setCart(cart.filter(item => item.id !== id));
+
+  const cartCount = cart.reduce((total, item) => total + item.qty, 0);
 
   return (
     <Router>
       <div style={styles.container}>
         <nav style={styles.nav}>
           <Link style={styles.link} to="/">STREAMLIST</Link>
-          <Link style={styles.link} to="/movies">MOVIES (API)</Link>
-          <Link style={styles.link} to="/cart">CART</Link>
+          <Link style={styles.link} to="/services">SERVICES</Link>
+          <Link style={styles.link} to="/cart">
+            CART <span style={styles.badge}>{cartCount}</span>
+          </Link>
           <Link style={styles.link} to="/billing">BILLING</Link>
-          {user && <button onClick={() => setUser(null)} style={{background:'none', color:'red', border:'1px solid red', cursor:'pointer', padding:'5px', marginLeft:'10px'}}>Logout</button>}
         </nav>
 
         <Routes>
-          <Route path="/" element={user ? <StreamList list={list} setList={setList} /> : <Navigate to="/login" />} />
-          <Route path="/login" element={<Login onLogin={() => setUser({name: "Group 2"})} />} />
-          <Route path="/movies" element={<Movies onAdd={addToList} />} />
-          <Route path="/cart" element={<Cart />} />
+          <Route path="/" element={<StreamList />} />
+          <Route path="/services" element={<Services onAdd={addToCart} />} />
+          <Route path="/cart" element={<CartView cart={cart} onUpdate={updateQty} onRemove={removeFromCart} />} />
           <Route path="/billing" element={<Billing />} />
         </Routes>
       </div>
@@ -65,127 +88,70 @@ export default function App() {
   );
 }
 
-function Login({ onLogin }) {
+// --- SERVICES PAGE (Subscription + Accessories) ---
+function Services({ onAdd }) {
   return (
-    <div style={{ maxWidth: '400px', margin: '100px auto', textAlign: 'center' }}>
-      <h1 style={{color: '#E50914'}}>EZTechMovie</h1>
-      <input style={styles.input} type="email" placeholder="Email" />
-      <input style={styles.input} type="password" placeholder="Password" />
-      <button style={{...styles.button, width:'100%'}} onClick={onLogin}>Sign In</button>
+    <div>
+      <h2>Streaming Subscriptions</h2>
+      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        {SUBSCRIPTIONS.map(s => (
+          <div key={s.id} style={styles.card}>
+            <h3>{s.name}</h3>
+            <p>${s.price}/mo</p>
+            <button style={styles.button} onClick={() => onAdd(s)}>Add Subscription</button>
+          </div>
+        ))}
+      </div>
+
+      <h2 style={{ marginTop: '40px' }}>EZTech Accessories</h2>
+      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+        {ACCESSORIES.map(a => (
+          <div key={a.id} style={styles.card}>
+            <h3>{a.name}</h3>
+            <p>${a.price}</p>
+            <button style={styles.button} onClick={() => onAdd(a)}>Add to Cart</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-function StreamList({ list, setList }) {
-  const [item, setItem] = useState('');
-
-  const add = () => { 
-    if(item) { 
-      setList([...list, {id: Date.now(), title: item}]); 
-      setItem(''); 
-    } 
-  };
-  const del = (id) => setList(list.filter(m => m.id !== id));
+// --- CART VIEW PAGE ---
+function CartView({ cart, onUpdate, onRemove }) {
+  const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
   return (
-    <div style={{ maxWidth: '600px', margin: 'auto' }}>
-      <h2>My Watchlist (LocalStorage Active)</h2>
-      <div style={{display:'flex', gap:'10px'}}>
-        <input style={styles.input} value={item} onChange={e => setItem(e.target.value)} placeholder="Add movie manually..." />
-        <button style={styles.button} onClick={add}>Add</button>
-      </div>
-      {list.length === 0 ? <p>Your list is empty. Go to MOVIES to search and add!</p> : null}
-      {list.map(m => (
-        <div key={m.id} style={styles.card}>
-          {m.title} 
-          <button onClick={() => del(m.id)} style={{float:'right', color:'red', background:'none', border:'none', cursor:'pointer'}}>Delete</button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Movies({ onAdd }) {
-  const [query, setQuery] = useState('');
-  const [movies, setMovies] = useState([]);
-  const API_KEY = '3483f9cf45ef2f699a49557493dae62c'; 
-
-  const searchMovies = async () => {
-    if (!query) return;
-    try {
-      const response = await fetch(`https://api.themoviedb.org/3/search/movie?api_key=${API_KEY}&query=${query}`);
-      const data = await response.json();
-      setMovies(data.results || []);
-    } catch (err) {
-      console.error("API Error:", err);
-    }
-  };
-
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Global Movie Search (TMDB API)</h2>
-      <div style={{ maxWidth: '500px', margin: 'auto', display: 'flex', gap: '10px' }}>
-        <input style={styles.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for movies..." />
-        <button style={styles.button} onClick={searchMovies}>Search API</button>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '20px', marginTop: '30px' }}>
-        {movies.map(m => (
-          <div key={m.id} style={{ ...styles.card, width: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <div>
-              <img src={m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : 'https://via.placeholder.com/180x270?text=No+Image'} alt={m.title} style={styles.poster} />
-              <h4 style={{fontSize:'12px', margin:'10px 0'}}>{m.title}</h4>
-              <p style={{color:'gold', fontSize:'12px'}}>★ {m.vote_average}</p>
+    <div style={{ maxWidth: '800px', margin: 'auto' }}>
+      <h2>Your Shopping Cart</h2>
+      {cart.length === 0 ? <p>Your cart is empty.</p> : (
+        <>
+          {cart.map(item => (
+            <div key={item.id} style={styles.card}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h4>{item.name}</h4>
+                  <p>${item.price} x {item.qty}</p>
+                </div>
+                <div>
+                  <button style={styles.qtyBtn} onClick={() => onUpdate(item.id, -1)}>-</button>
+                  <span>{item.qty}</span>
+                  <button style={styles.qtyBtn} onClick={() => onUpdate(item.id, 1)}>+</button>
+                  <button onClick={() => onRemove(item.id)} style={{ marginLeft: '20px', color: 'red', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                </div>
+              </div>
             </div>
-            <button style={styles.addBtn} onClick={() => onAdd(m.title)}>+ Add to List</button>
+          ))}
+          <div style={{ textAlign: 'right', borderTop: '1px solid white', paddingTop: '20px' }}>
+            <h3>Total Price: ${total.toFixed(2)}</h3>
+            <button style={styles.button}>Proceed to Checkout</button>
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
-// Cart and Billing components stay the same as before...
-function Cart() {
-  const [selected, setSelected] = useState(() => {
-    const saved = localStorage.getItem('selectedPlan');
-    return saved ? JSON.parse(saved) : null;
-  });
-  useEffect(() => { localStorage.setItem('selectedPlan', JSON.stringify(selected)); }, [selected]);
-  const plans = [{ name: "Individual", price: 10 }, { name: "Friendly", price: 15 }, { name: "Family", price: 20 }];
-  return (
-    <div style={{ textAlign: 'center' }}>
-      <h2>Select Experience Plan</h2>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
-        {plans.map(p => (
-          <div key={p.name} style={{ ...styles.card, border: selected?.name === p.name ? '2px solid #E50914' : '1px solid #444', width:'150px' }}>
-            <h3>{p.name}</h3><p>${p.price}/mo</p>
-            <button style={styles.button} onClick={() => setSelected(p)}>Select</button>
-          </div>
-        ))}
-      </div>
-      {selected && <h3>Total: ${selected.price}.00 (Saved)</h3>}
-    </div>
-  );
-}
-
-function Billing() {
-  const [cards, setCards] = useState(() => {
-    const saved = localStorage.getItem('userCards');
-    return saved ? JSON.parse(saved) : [];
-  });
-  const [num, setNum] = useState('');
-  useEffect(() => { localStorage.setItem('userCards', JSON.stringify(cards)); }, [cards]);
-  const save = () => { if(num) { setCards([...cards, num]); setNum(''); } };
-  return (
-    <div style={{ maxWidth: '500px', margin: 'auto' }}>
-      <h2>Billing Management</h2>
-      <div style={styles.card}>
-        <input style={styles.input} placeholder="Card Number" value={num} onChange={e => setNum(e.target.value)} />
-        <button style={styles.button} onClick={save}>Save Card</button>
-      </div>
-      {cards.map((c, i) => (
-        <div key={i} style={styles.card}>**** **** **** {c.slice(-4)} <button onClick={() => setCards(cards.filter((_, idx) => idx !== i))} style={{float:'right', color:'gray', background:'none', border:'none', cursor:'pointer'}}>Remove</button></div>
-      ))}
-    </div>
-  );
-}
+// Stubs for other routes
+function StreamList() { return <h2>My StreamList</h2>; }
+function Billing() { return <h2>Billing Management</h2>; }
