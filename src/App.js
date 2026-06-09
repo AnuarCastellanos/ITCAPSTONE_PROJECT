@@ -8,6 +8,7 @@ const styles = {
   card: { background: '#2f2f2f', padding: '15px', borderRadius: '10px', marginBottom: '15px', position: 'relative' },
   input: { padding: '12px', margin: '10px 0', width: '100%', borderRadius: '4px', border: 'none', fontSize: '16px' },
   button: { padding: '12px 24px', backgroundColor: '#E50914', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', fontWeight: 'bold' },
+  addBtn: { padding: '8px 12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', cursor: 'pointer', borderRadius: '4px', marginTop: '10px', width: '100%', fontWeight: 'bold' },
   poster: { width: '100%', borderRadius: '5px' }
 };
 
@@ -17,9 +18,29 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // SHARED STATE: Moved list up to App so both pages can access it
+  const [list, setList] = useState(() => {
+    const saved = localStorage.getItem('myStreamList');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   useEffect(() => {
     localStorage.setItem('ezUser', JSON.stringify(user));
   }, [user]);
+
+  useEffect(() => {
+    localStorage.setItem('myStreamList', JSON.stringify(list));
+  }, [list]);
+
+  // Helper to add from either page
+  const addToList = (title) => {
+    if (!list.find(m => m.title === title)) {
+      setList([...list, { id: Date.now(), title: title }]);
+      alert(`${title} added to StreamList!`);
+    } else {
+      alert("Movie already in list!");
+    }
+  };
 
   return (
     <Router>
@@ -29,13 +50,13 @@ export default function App() {
           <Link style={styles.link} to="/movies">MOVIES (API)</Link>
           <Link style={styles.link} to="/cart">CART</Link>
           <Link style={styles.link} to="/billing">BILLING</Link>
-          {user && <button onClick={() => setUser(null)} style={{background:'none', color:'red', border:'1px solid red', cursor:'pointer', padding:'5px'}}>Logout</button>}
+          {user && <button onClick={() => setUser(null)} style={{background:'none', color:'red', border:'1px solid red', cursor:'pointer', padding:'5px', marginLeft:'10px'}}>Logout</button>}
         </nav>
 
         <Routes>
-          <Route path="/" element={user ? <StreamList /> : <Navigate to="/login" />} />
+          <Route path="/" element={user ? <StreamList list={list} setList={setList} /> : <Navigate to="/login" />} />
           <Route path="/login" element={<Login onLogin={() => setUser({name: "Group 2"})} />} />
-          <Route path="/movies" element={<Movies />} />
+          <Route path="/movies" element={<Movies onAdd={addToList} />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/billing" element={<Billing />} />
         </Routes>
@@ -48,29 +69,20 @@ function Login({ onLogin }) {
   return (
     <div style={{ maxWidth: '400px', margin: '100px auto', textAlign: 'center' }}>
       <h1 style={{color: '#E50914'}}>EZTechMovie</h1>
-      <input style={styles.input} type="email" placeholder="Email (Try user@eztech.com)" />
+      <input style={styles.input} type="email" placeholder="Email" />
       <input style={styles.input} type="password" placeholder="Password" />
       <button style={{...styles.button, width:'100%'}} onClick={onLogin}>Sign In</button>
     </div>
   );
 }
 
-function StreamList() {
-  const [list, setList] = useState(() => {
-    const saved = localStorage.getItem('myStreamList');
-    return saved ? JSON.parse(saved) : [];
-  });
+function StreamList({ list, setList }) {
   const [item, setItem] = useState('');
-
-  useEffect(() => {
-    localStorage.setItem('myStreamList', JSON.stringify(list));
-  }, [list]);
 
   const add = () => { 
     if(item) { 
-        console.log("Adding to LocalStorage:", item); // Required for Week 1/2 lingering reqs
-        setList([...list, {id: Date.now(), title: item}]); 
-        setItem(''); 
+      setList([...list, {id: Date.now(), title: item}]); 
+      setItem(''); 
     } 
   };
   const del = (id) => setList(list.filter(m => m.id !== id));
@@ -79,9 +91,10 @@ function StreamList() {
     <div style={{ maxWidth: '600px', margin: 'auto' }}>
       <h2>My Watchlist (LocalStorage Active)</h2>
       <div style={{display:'flex', gap:'10px'}}>
-        <input style={styles.input} value={item} onChange={e => setItem(e.target.value)} placeholder="Add movie to cloud list..." />
+        <input style={styles.input} value={item} onChange={e => setItem(e.target.value)} placeholder="Add movie manually..." />
         <button style={styles.button} onClick={add}>Add</button>
       </div>
+      {list.length === 0 ? <p>Your list is empty. Go to MOVIES to search and add!</p> : null}
       {list.map(m => (
         <div key={m.id} style={styles.card}>
           {m.title} 
@@ -92,7 +105,7 @@ function StreamList() {
   );
 }
 
-function Movies() {
+function Movies({ onAdd }) {
   const [query, setQuery] = useState('');
   const [movies, setMovies] = useState([]);
   const API_KEY = '3483f9cf45ef2f699a49557493dae62c'; 
@@ -115,13 +128,15 @@ function Movies() {
         <input style={styles.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search for movies..." />
         <button style={styles.button} onClick={searchMovies}>Search API</button>
       </div>
-
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '20px', marginTop: '30px' }}>
         {movies.map(m => (
-          <div key={m.id} style={{ ...styles.card, width: '200px' }}>
-            <img src={m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : 'https://via.placeholder.com/200x300?text=No+Image'} alt={m.title} style={styles.poster} />
-            <h4 style={{fontSize:'14px', margin:'10px 0'}}>{m.title}</h4>
-            <p style={{color:'gold'}}>★ {m.vote_average}</p>
+          <div key={m.id} style={{ ...styles.card, width: '180px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div>
+              <img src={m.poster_path ? `https://image.tmdb.org/t/p/w200${m.poster_path}` : 'https://via.placeholder.com/180x270?text=No+Image'} alt={m.title} style={styles.poster} />
+              <h4 style={{fontSize:'12px', margin:'10px 0'}}>{m.title}</h4>
+              <p style={{color:'gold', fontSize:'12px'}}>★ {m.vote_average}</p>
+            </div>
+            <button style={styles.addBtn} onClick={() => onAdd(m.title)}>+ Add to List</button>
           </div>
         ))}
       </div>
@@ -129,31 +144,26 @@ function Movies() {
   );
 }
 
+// Cart and Billing components stay the same as before...
 function Cart() {
   const [selected, setSelected] = useState(() => {
     const saved = localStorage.getItem('selectedPlan');
     return saved ? JSON.parse(saved) : null;
   });
-
-  useEffect(() => {
-    localStorage.setItem('selectedPlan', JSON.stringify(selected));
-  }, [selected]);
-
+  useEffect(() => { localStorage.setItem('selectedPlan', JSON.stringify(selected)); }, [selected]);
   const plans = [{ name: "Individual", price: 10 }, { name: "Friendly", price: 15 }, { name: "Family", price: 20 }];
-
   return (
     <div style={{ textAlign: 'center' }}>
       <h2>Select Experience Plan</h2>
       <div style={{ display: 'flex', justifyContent: 'center', gap: '20px' }}>
         {plans.map(p => (
           <div key={p.name} style={{ ...styles.card, border: selected?.name === p.name ? '2px solid #E50914' : '1px solid #444', width:'150px' }}>
-            <h3>{p.name}</h3>
-            <p>${p.price}/mo</p>
+            <h3>{p.name}</h3><p>${p.price}/mo</p>
             <button style={styles.button} onClick={() => setSelected(p)}>Select</button>
           </div>
         ))}
       </div>
-      {selected && <div style={{marginTop:'20px'}}><h3>Cart Total: ${selected.price}.00 (Persisted)</h3></div>}
+      {selected && <h3>Total: ${selected.price}.00 (Saved)</h3>}
     </div>
   );
 }
@@ -164,25 +174,17 @@ function Billing() {
     return saved ? JSON.parse(saved) : [];
   });
   const [num, setNum] = useState('');
-
-  useEffect(() => {
-    localStorage.setItem('userCards', JSON.stringify(cards));
-  }, [cards]);
-
+  useEffect(() => { localStorage.setItem('userCards', JSON.stringify(cards)); }, [cards]);
   const save = () => { if(num) { setCards([...cards, num]); setNum(''); } };
-
   return (
     <div style={{ maxWidth: '500px', margin: 'auto' }}>
-      <h2>Secure Billing Management</h2>
+      <h2>Billing Management</h2>
       <div style={styles.card}>
         <input style={styles.input} placeholder="Card Number" value={num} onChange={e => setNum(e.target.value)} />
-        <button style={styles.button} onClick={save}>Save Payment Method</button>
+        <button style={styles.button} onClick={save}>Save Card</button>
       </div>
       {cards.map((c, i) => (
-        <div key={i} style={styles.card}>
-          **** **** **** {c.slice(-4)}
-          <button onClick={() => setCards(cards.filter((_, idx) => idx !== i))} style={{float:'right', color:'gray', background:'none', border:'none', cursor:'pointer'}}>Remove</button>
-        </div>
+        <div key={i} style={styles.card}>**** **** **** {c.slice(-4)} <button onClick={() => setCards(cards.filter((_, idx) => idx !== i))} style={{float:'right', color:'gray', background:'none', border:'none', cursor:'pointer'}}>Remove</button></div>
       ))}
     </div>
   );
