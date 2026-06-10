@@ -77,7 +77,7 @@ function Login({ onLogin }) {
       <p style={{margin:'20px 0', fontSize:'12px'}}>OR</p>
       {/* AI RECOMMENDATION: Added OAuth Placeholder for Week 4 Requirement */}
       <button style={styles.oauthBtn} onClick={onLogin}>
-        <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" width="18" alt="G"/>
+        <img src="https://fonts.gstatic.com/s/i/productlogos/googleg/v6/24px.svg" width="18" alt="G"/>
         Continue with Google (OAuth)
       </button>
     </div>
